@@ -3,17 +3,16 @@ import './App.css'
 import { invoke } from '@tauri-apps/api/core';
 
 function App() {
-  const [message, setMessage] = useState('');
+  const [response, setResponse] = useState('');
   const [loading, setLoading] = useState(false);
 
-  const pingPython = async () => {
+  const sendPing = async () => {
     setLoading(true);
-
     try {
-      const response = await invoke<string>('python_ping');
-      setMessage(response);
+      const result = await invoke<string>('python_request', { request: JSON.stringify({ command: 'ping' }) });
+      setResponse(result);
     } catch (error) {
-      setMessage(`Error: ${error}`);
+      setResponse(`Error: ${error}`);
     } finally {
       setLoading(false);
     }
@@ -23,9 +22,9 @@ function App() {
     <main>
       <h1>BMis Desktop</h1>
 
-      <button onClick={pingPython} disabled={loading}>{loading ? 'Pinging...' : 'Ping Python'}</button>
+      <button onClick={sendPing} disabled={loading}>{loading ? 'Pinging...' : 'Ping Python'}</button>
 
-      {message && <p>{message}</p>}
+      {response && <p>{response}</p>}
     </main>
   );
 }
