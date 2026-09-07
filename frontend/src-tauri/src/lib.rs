@@ -30,13 +30,13 @@ pub fn run() {
 
             Ok(())
         })
-        .invoke_handler(tauri::generate_handler![python_ping])
+        .invoke_handler(tauri::generate_handler![python_request])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
 }
 
 #[tauri::command]
-fn python_ping(state: tauri::State<'_, AppState>) -> Result<String, String> {
+fn python_request(state: tauri::State<'_, AppState>, request: String) -> Result<String, String> {
     let request = r#"{"command":"ping"}"#;
 
     let mut python = state
@@ -44,5 +44,5 @@ fn python_ping(state: tauri::State<'_, AppState>) -> Result<String, String> {
         .lock()
         .map_err(|_| "Failed to lock Python process".to_string())?;
 
-    python.send_request(request)
+    python.send_request(&request)
 }
