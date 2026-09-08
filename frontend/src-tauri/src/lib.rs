@@ -36,9 +36,10 @@ pub fn run() {
 }
 
 #[tauri::command]
-fn python_request(state: tauri::State<'_, AppState>, request: String) -> Result<String, String> {
-    let request = r#"{"command":"ping"}"#;
-
+fn python_request(
+    state: tauri::State<'_, AppState>, 
+    request: String
+) -> Result<String, String> {
     let mut python = state
         .python
         .lock()
