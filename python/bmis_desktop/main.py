@@ -32,11 +32,6 @@ def main():
                 "status": False,
                 "error": "Invalid JSON",
             }
-        except Exception as error:
-            response = {
-                "status": False,
-                "error": f"Internal server error: {error}",
-            }
 
         print(json.dumps(response), flush=True)
 
