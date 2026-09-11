@@ -110,3 +110,36 @@ def test_client_handles_response_split_across_tcp_chunks():
 
     thread.join()
     server.close()
+
+def test_client_handles_response_split_across_tcp_chunks():
+    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    server.bind(("127.0.0.1", 0))
+    server.listen(1)
+
+    host, port = server.getsockname()
+
+    def server_worker():
+        connection, _ = server.accept()
+
+        data = connection.recv(1024)
+        assert data == b"GET name\n"
+
+        connection.sendall(b"$5\r\nhe")
+        connection.sendall(b"llo\r\n")
+
+        connection.close()
+
+    thread = threading.Thread(target=server_worker)
+    thread.start()
+
+    client = BMisClient(host, port)
+    client.connect()
+
+    response = client.execute("GET name")
+
+    assert response == "hello"
+
+    client.close()
+
+    thread.join()
+    server.close()
