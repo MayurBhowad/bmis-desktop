@@ -1,8 +1,8 @@
 import socket
-from bmis_desktop.bmis.protocol import decode_response
-
+from bmis_desktop.bmis.protocol import ProtocolParser
 class BMisClient:
     def __init__(self, host: str, port: int) -> None:
+        self._parser = ProtocolParser()
         self.host = host
         self.port = port
         self._socket: socket.socket | None = None
@@ -19,9 +19,16 @@ class BMisClient:
 
         self._socket.sendall(f"{command}\n".encode("utf-8"))
 
-        data = self._socket.recv(4096)
+        while True:
+            data = self._socket.recv(4096)
 
-        return decode_response(data)
+            if not data:
+                raise ConnectionError("BMis server closed the connection")
+
+            response = self._parser.feed(data)
+
+            if response is not None:
+                return response
     
     def close(self) -> None:
         if self._socket is not None:
