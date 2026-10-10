@@ -1,5 +1,5 @@
 import socket
-from bmis_desktop.bmis.protocol import ProtocolParser
+from bmis_desktop.bmis.protocol import INCOMPLETE, ProtocolParser
 class BMisClient:
     def __init__(self, host: str, port: int) -> None:
         self._parser = ProtocolParser()
@@ -27,7 +27,7 @@ class BMisClient:
 
             response = self._parser.feed(data)
 
-            if response is not None:
+            if response is not INCOMPLETE:
                 return response
     
     def close(self) -> None:
