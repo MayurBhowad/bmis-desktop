@@ -2,10 +2,23 @@ import json
 import sys
 
 
-def handle_request(request: dict) -> dict:
+
+def handle_request(request: object) -> dict:
+    if not isinstance(request, dict):
+        return {
+            "status": False,
+            "error": "Request must be a JSON object",
+        }
+
     command = request.get("command")
 
-    if command == 'ping':
+    if not isinstance(command, str) or not command.strip():
+        return {
+            "status": False,
+            "error": "Command must be a non-empty string",
+        }
+
+    if command == "ping":
         return {
             "status": True,
             "message": "BMis python backend is running",
