@@ -9,8 +9,7 @@ pub struct PythonProcessManager {
 
 impl PythonProcessManager {
     pub fn start() -> Result<Self, String> {
-        let project_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../..");
+        let project_root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
 
         let python = project_root.join("python/.venv/bin/python");
 
@@ -23,15 +22,23 @@ impl PythonProcessManager {
             .spawn()
             .map_err(|error| format!("Failed to start Python backend: {error}"))?;
 
-        let stdin = child
-            .stdin
-            .take()
-            .ok_or_else(|| "Failed to open Python stdin".to_string())?;
+        let stdin = match child.stdin.take() {
+            Some(stdin) => stdin,
+            None => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("Failed to open Python stdin".to_string());
+            }
+        };
 
-        let stdout = child
-            .stdout
-            .take()
-            .ok_or_else(|| "Failed to open Python stdout".to_string())?;
+        let stdout = match child.stdout.take() {
+            Some(stdout) => stdout,
+            None => {
+                let _ = child.kill();
+                let _ = child.wait();
+                return Err("Failed to open Python stdout".to_string());
+            }
+        };
 
         Ok(Self {
             child,
@@ -90,8 +97,7 @@ mod tests {
 
     #[test]
     fn sends_ping_request() {
-        let mut manager =
-            PythonProcessManager::start().expect("Python backend should start");
+        let mut manager = PythonProcessManager::start().expect("Python backend should start");
 
         let response = manager
             .send_request(r#"{"command":"ping"}"#)
@@ -103,8 +109,7 @@ mod tests {
 
     #[test]
     fn supports_multiple_requests_on_same_process() {
-        let mut manager =
-            PythonProcessManager::start().expect("Python backend should start");
+        let mut manager = PythonProcessManager::start().expect("Python backend should start");
 
         let first_response = manager
             .send_request(r#"{"command":"ping"}"#)
@@ -120,8 +125,7 @@ mod tests {
 
     #[test]
     fn forwards_unknown_command() {
-        let mut manager =
-            PythonProcessManager::start().expect("Python backend should start");
+        let mut manager = PythonProcessManager::start().expect("Python backend should start");
 
         let response = manager
             .send_request(r#"{"command":"unknown"}"#)
@@ -135,8 +139,7 @@ mod tests {
 
     #[test]
     fn keeps_same_process_for_multiple_requests() {
-        let mut manager =
-            PythonProcessManager::start().expect("Python backend should start");
+        let mut manager = PythonProcessManager::start().expect("Python backend should start");
 
         let first_pid = manager.pid();
 
