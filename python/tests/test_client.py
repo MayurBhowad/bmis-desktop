@@ -1,5 +1,6 @@
 import socket
 import threading
+import pytest
 
 from bmis_desktop.bmis.client import BMisClient
 
@@ -111,35 +112,17 @@ def test_client_handles_response_split_across_tcp_chunks():
     thread.join()
     server.close()
 
-def test_client_handles_response_split_across_tcp_chunks():
-    server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    server.bind(("127.0.0.1", 0))
-    server.listen(1)
+@pytest.mark.integration
+def test_client_executes_set_and_get_against_real_bmis_server():
+    client = BMisClient("127.0.0.1", 6379)
 
-    host, port = server.getsockname()
+    try:
+        client.connect()
 
-    def server_worker():
-        connection, _ = server.accept()
+        set_response = client.execute("SET bmis_desktop_test Mayur")
+        get_response = client.execute("GET bmis_desktop_test")
 
-        data = connection.recv(1024)
-        assert data == b"GET name\n"
-
-        connection.sendall(b"$5\r\nhe")
-        connection.sendall(b"llo\r\n")
-
-        connection.close()
-
-    thread = threading.Thread(target=server_worker)
-    thread.start()
-
-    client = BMisClient(host, port)
-    client.connect()
-
-    response = client.execute("GET name")
-
-    assert response == "hello"
-
-    client.close()
-
-    thread.join()
-    server.close()
+        assert set_response == "OK"
+        assert get_response == "Mayur"
+    finally:
+        client.close()
