@@ -21,10 +21,10 @@ Tauri command result → React state/UI
 
 ### Frontend
 
-- `frontend/src/App.tsx` renders the prototype UI.
-- The current button invokes the Tauri command `python_request`.
-- The current command payload is JSON containing `{"command":"ping"}`.
-- In this prototype, `ping` means **Python backend health**, not a BMis server `PING` command.
+- `frontend/src/App.tsx` renders the desktop UI and calls the Tauri command `python_request`.
+- **Ping Python** sends `{"command":"ping"}`. That checks the Python process. It is not a BMis server command.
+- **BMis server** sends `connect` with `host` and `port`, `status`, and `disconnect`.
+- **Command console** sends `execute` with the raw BMis command in `request`, then shows the JSON response, including `result`.
 
 ### Tauri host
 
@@ -38,7 +38,18 @@ Tauri command result → React state/UI
 - `python/bmis_desktop/main.py` is the JSON Lines IPC entry point. One `BackendSession` lives for the process and closes its socket when stdin ends.
 - `python/bmis_desktop/session.py` validates desktop operations and keeps a single `BMisClient` across requests.
 - `python/bmis_desktop/bmis/client.py` and `protocol.py` implement the BMis TCP client and response parsing.
-- Desktop operations are `ping`, `connect`, `status`, `execute`, and `disconnect`. `ping` checks the Python process. `execute` sends the raw BMis command in `request`. The UI still sends only `ping`.
+- Desktop operations are `ping`, `connect`, `status`, `execute`, and `disconnect`. `ping` checks the Python process. `execute` sends the raw BMis command in `request`. The UI sends all five operations.
+
+## Verified BMis commands
+
+The live acceptance check uses a BMis server at `127.0.0.1:6379`:
+
+| Command | Server result |
+|---|---|
+| `SET desktop_test Mayur` | `OK` |
+| `GET desktop_test` | `Mayur` |
+
+`python/tests/test_session.py` records that check as `test_session_set_and_get_against_real_bmis_server`. The command console displays those decoded results. A separate unit test feeds a local socket the simple string `PONG` for the raw command `PING`; that socket is not the BMis server.
 
 ## Target end-to-end architecture
 
@@ -55,7 +66,7 @@ Python backend
 BMis TCP server
 ```
 
-The target architecture is not considered complete until a test demonstrates a real command travelling from the UI through Tauri and Python to a running BMis server and back.
+The first command path is in place: the UI connects and sends a command through Tauri and Python to a running BMis server, and the integration test records the server response. Saved connections, the key browser, and the data viewer remain later work.
 
 ## IPC contract
 

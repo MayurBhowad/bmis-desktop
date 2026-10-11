@@ -12,6 +12,8 @@ The project has not published a production release yet. Entries below summarize 
 - Long-running Python backend communicating with Tauri over newline-delimited JSON on stdin/stdout.
 - Python BMis TCP client and incremental response parser.
 - Python IPC request validation and malformed-JSON recovery tests.
+- Desktop connection flow: host and port, connect, status, disconnect, and a command console that displays the BMis response.
+- Live server check for `SET desktop_test Mayur` (`OK`) and `GET desktop_test` (`Mayur`).
 - Client connection timeouts, command validation, and connection lifecycle handling.
 - Separation of unit tests from tests requiring a running BMis server.
 - Tauri Content Security Policy configuration.
@@ -25,6 +27,5 @@ The project has not published a production release yet. Entries below summarize 
 
 ### Known limitations
 
-- The current UI health check tests the Python backend only; it does not yet send commands to a BMis server.
 - Python is launched from `python/.venv/bin/python` in development; packaged sidecar/runtime support is pending.
-- Connection management UI, key browser, data viewer, command console, and production installers remain roadmap items.
+- Saved connections, key browser, data viewer, and production installers remain roadmap items.

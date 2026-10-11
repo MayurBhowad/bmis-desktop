@@ -41,7 +41,13 @@ From `frontend/`:
 npm run tauri dev
 ```
 
-The current UI's **Ping Python** button tests the Python process/IPC loop. It does not test a connection to the BMis server.
+The window has three areas:
+
+- **Ping Python** checks the Python process and the IPC loop. It does not open a BMis connection.
+- **BMis server** connects to the host and port in the form. The defaults are `127.0.0.1` and `6379`. **Refresh Status** reads the current connection. **Disconnect** closes that socket.
+- **Command console** is available while the server status is connected. It sends the entered text as one BMis command.
+
+Start a compatible BMis server before using Connect. The recorded live commands are `SET desktop_test Mayur`, which returns `OK`, and `GET desktop_test`, which returns `Mayur`.
 
 ## Test commands
 
