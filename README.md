@@ -2,7 +2,7 @@
 
 BMis Desktop is a desktop client prototype for the existing **BMis** server. It is a separate project: it does not reimplement the server or own the server's protocol and data-storage behavior.
 
-> **Current status:** the desktop shell can call a long-running Python process through Tauri IPC. The current UI's **Ping Python** button checks that the Python backend is alive; it does **not** ping a BMis server. The BMis TCP client exists as a separate Python component, but the full UI-to-BMis connection flow is not yet implemented.
+> **Current status:** the UI checks the Python backend, connects to one BMis server, sends a command, and shows the server response. **Ping Python** checks the Python process. The live server check is `SET desktop_test Mayur` → `OK` and `GET desktop_test` → `Mayur` on `127.0.0.1:6379`.
 
 ## Current stack
 
@@ -27,13 +27,13 @@ Long-running Python process
 Tauri command → React UI
 ```
 
-The intended future BMis command path is:
+The BMis command path is:
 
 ```text
 React UI → Tauri IPC → Python backend → BMis TCP client → BMis server
 ```
 
-The latter is **target architecture**, not yet a completed end-to-end feature. See [Architecture](docs/ARCHITECTURE.md) for the distinction.
+See [Architecture](docs/ARCHITECTURE.md) for the IPC contract and the recorded server commands.
 
 ## Repository layout
 
@@ -89,13 +89,13 @@ From `frontend/`:
 npm run tauri dev
 ```
 
-Use **Ping Python** to verify that the UI can communicate with the Python process. A successful response currently looks like:
+Use **Ping Python** to verify that the UI can communicate with the Python process. A successful response looks like:
 
 ```json
 {"status": true, "message": "BMis python backend is running"}
 ```
 
-This confirms Python IPC only; it does not verify a connection to the BMis server.
+That confirms Python IPC. To reach BMis, start a server, click **Connect** (defaults: `127.0.0.1` and `6379`), then run a command such as `SET desktop_test Mayur` and `GET desktop_test`. See the [user guide](docs/USER_GUIDE.md).
 
 ## Tests and checks
 
@@ -158,4 +158,4 @@ Use `local-dev` for local work if following the repository's three-branch workfl
 
 ## Scope and limitations
 
-Not yet complete: production Python packaging, connection manager UI, BMis server connection from the UI, key browser, data viewer, command console, and production release validation. Track these against `BMis-Desktop-PLAN.md`; do not describe planned functionality as implemented.
+Not yet complete: production Python packaging, saved-connection manager, key browser, data viewer, and production release validation. One live connection and a command console are implemented. Track the rest against `BMis-Desktop-PLAN.md`; do not describe planned functionality as implemented.

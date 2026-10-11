@@ -384,7 +384,7 @@ The first release must be deliberately small.
 4. Python sidecar starts automatically.
 5. Frontend can communicate with Python.
 6. Python can connect to BMis.
-7. PING command.
+7. A verified BMis command from the UI. The live record is `SET` and `GET`.
 8. Basic command execution.
 9. Basic connection management.
 10. Basic error handling.
@@ -403,10 +403,25 @@ User enters BMis connection
     |
 Connection succeeds
     |
-PING succeeds
+SET desktop_test Mayur returns OK
+    |
+GET desktop_test returns Mayur
 ```
 
 This milestone proves the architecture.
+
+### Implementation status
+
+The current prototype covers this foundation slice:
+
+- The app starts, Tauri launches the UI, and one Python process stays up for IPC.
+- **Ping Python** reports Python health. That IPC command is separate from a BMis server command.
+- The user enters a host and port, connects, refreshes status, and disconnects. Disconnect closes the socket.
+- The command console sends one raw BMis command and displays the decoded server value.
+- Invalid host or port, refused connections, timeouts, and server errors return a structured error and leave the UI and Python process running.
+- The live server record, against `127.0.0.1:6379`, is `SET desktop_test Mayur` → `OK` and `GET desktop_test` → `Mayur`.
+
+Still outside this slice: saved connections, credentials, key browser, data viewer, application logging, bundled Python, and production packaging. Those stay in the later sections of this plan.
 
 ---
 
@@ -1200,11 +1215,9 @@ Do not assume Redis behavior is automatically identical to BMis.
 
 # 32. Current Priority
 
-The only current priority is:
+The V0.1 connection slice is in place: Tauri talks to one Python process, and that process can connect to an existing BMis server and run the recorded `SET` / `GET` commands.
 
-> Build the BMis Desktop foundation and prove that Tauri can launch the bundled Python backend and communicate with an existing BMis instance.
-
-Do not implement the full UI yet.
+Do not implement the full product UI yet. Saved connections, the key browser, and the data viewer stay later.
 
 ---
 
@@ -1309,6 +1322,8 @@ Do not implement every command yet.
 
 ## Step 5 — Connect to BMis
 
+Status: implemented for one live connection. The recorded server commands are `SET desktop_test Mayur` → `OK` and `GET desktop_test` → `Mayur` on `127.0.0.1:6379`.
+
 Test against the real existing BMis repository.
 
 Flow:
@@ -1323,16 +1338,23 @@ Python
 Existing BMis
       |
       v
-PING
+SET desktop_test Mayur
       |
       v
-PONG
+OK
+      |
+      v
+GET desktop_test
+      |
+      v
+Mayur
 ```
 
 Acceptance:
 
 - Connect succeeds.
-- PING succeeds.
+- `SET desktop_test Mayur` returns `OK`.
+- `GET desktop_test` returns `Mayur`.
 - Connection failure is handled.
 - Invalid host/port is handled.
 - Backend does not crash.
@@ -1341,13 +1363,7 @@ Acceptance:
 
 ## Step 6 — First End-to-End Feature
 
-Implement:
-
-```text
-PING
-```
-
-from the UI.
+Status: implemented. The UI connects, sends the command through Tauri and Python, and displays the server result. The live acceptance commands are `SET` and `GET`, recorded above.
 
 Example:
 
@@ -1356,10 +1372,11 @@ Example:
 
 Status: Connected
 
-[Ping BMis]
+Command: SET desktop_test Mayur
+Result: OK
 
-Result:
-PONG
+Command: GET desktop_test
+Result: Mayur
 ```
 
 This is the first complete vertical slice.
@@ -1506,7 +1523,7 @@ Unless explicitly changed later, use:
 - Initial target: **Linux**
 - Later targets: **Windows + macOS**
 - Development style: **Incremental vertical slices**
-- First real feature: **PING against existing BMis**
+- First real feature: **one live BMis connection and a verified command**. The recorded commands are `SET desktop_test Mayur` → `OK` and `GET desktop_test` → `Mayur`.
 
 ---
 
