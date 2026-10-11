@@ -1,52 +1,44 @@
 import json
 import sys
 
+from bmis_desktop.session import BackendSession, handle_request
+
+__all__ = ["handle_request", "main"]
 
 
-def handle_request(request: object) -> dict:
-    if not isinstance(request, dict):
-        return {
-            "status": False,
-            "error": "Request must be a JSON object",
-        }
-
-    command = request.get("command")
-
-    if not isinstance(command, str) or not command.strip():
-        return {
-            "status": False,
-            "error": "Command must be a non-empty string",
-        }
-
-    if command == "ping":
-        return {
-            "status": True,
-            "message": "BMis python backend is running",
-        }
-
-    return {
-        "status": False,
-        "error": f"Invalid command: {command}",
-    }
-
-    
-def main():
-    for line in sys.stdin:
-        line = line.strip()
-
-        if not line:
-            continue
-
-        try:
-            request = json.loads(line)
-            response = handle_request(request)
-        except json.JSONDecodeError:
-            response = {
+def _encode_response(response: object) -> str:
+    try:
+        return json.dumps(response)
+    except (TypeError, ValueError):
+        return json.dumps(
+            {
                 "status": False,
-                "error": "Invalid JSON",
+                "error": "BMis response could not be encoded",
             }
+        )
 
-        print(json.dumps(response), flush=True)
+
+def main() -> None:
+    session = BackendSession()
+    try:
+        for line in sys.stdin:
+            line = line.strip()
+            if not line:
+                continue
+
+            try:
+                request = json.loads(line)
+            except json.JSONDecodeError:
+                response: object = {
+                    "status": False,
+                    "error": "Invalid JSON",
+                }
+            else:
+                response = handle_request(request, session)
+
+            print(_encode_response(response), flush=True)
+    finally:
+        session.close()
 
 
 if __name__ == "__main__":
