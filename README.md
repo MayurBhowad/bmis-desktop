@@ -1,119 +1,161 @@
 # BMis Desktop
 
-Cross-platform desktop client for the existing **BMis** server.
+BMis Desktop is a desktop client prototype for the existing **BMis** server. It is a separate project: it does not reimplement the server or own the server's protocol and data-storage behavior.
 
-BMis Desktop is a **client**, not a reimplementation of BMis. The [BMis](../BMis) repository remains the source of truth for the server, protocol, persistence, and networking. This project owns the desktop UI, connection management, key browsing, data inspection, command console, packaging, and the bundled Python backend.
+> **Current status:** the desktop shell can call a long-running Python process through Tauri IPC. The current UI's **Ping Python** button checks that the Python backend is alive; it does **not** ping a BMis server. The BMis TCP client exists as a separate Python component, but the full UI-to-BMis connection flow is not yet implemented.
 
-> BMis Desktop is a client for BMis, not a replacement for BMis.
+## Current stack
 
-## Goals
+- **Desktop shell:** Tauri 2 / Rust
+- **Frontend:** React, TypeScript, Vite
+- **Python backend:** JSON Lines over the child process's stdin/stdout
+- **BMis client:** Python TCP client and response parser
+- **Tests:** pytest and Rust unit tests
 
-- Production-quality desktop client for local and remote BMis instances
-- Graphical key browser, data inspection/editing, and command console
-- Clean separation of frontend, desktop shell, and Python backend
-- Bundled Python runtime — end users do **not** install Python, Node.js, or other toolchains
-- Linux first, then Windows and macOS
-- Incremental delivery with tests and clear acceptance criteria
-
-### Non-goals
-
-- Reimplementing or modifying the BMis server for client convenience
-- Requiring users to install development tools
-- AI features, cloud sync, generic DB tooling, or unrelated productivity features before the core client is stable
-
-## Architecture
+The current IPC path is:
 
 ```text
-                    BMis Desktop
-                         |
-              +----------+----------+
-              |                     |
-        React + TypeScript        Tauri
-              |                     |
-              +----------+----------+
-                         |
-                  Python Sidecar
-                         |
-                    FastAPI
-                         |
-                   BMis Client
-                         |
-                         v
-                    Existing BMis
-                    (local / remote)
+React UI
+   │ Tauri invoke("python_request")
+   ▼
+Tauri command (Rust)
+   │ JSON request line over stdin
+   ▼
+Long-running Python process
+   │ JSON response line over stdout
+   ▼
+Tauri command → React UI
 ```
 
-| Layer | Technology | Role |
-|-------|------------|------|
-| Desktop shell | **Tauri** | Window, lifecycle, OS integration, start/stop Python sidecar, packaging |
-| Frontend | **React + TypeScript** | UI, navigation, key browser, data viewer, console, app state |
-| Backend | **Python + FastAPI + Pydantic** | BMis client, connections, commands, validation, data transforms |
-| Local storage | **SQLite** | Saved connections, preferences, command history — not BMis server data |
-
-Application logic lives in TypeScript and Python. Custom Rust is minimized; Tauri’s Rust layer is framework-only.
-
-Frontend ↔ Python uses localhost (`127.0.0.1:<dynamic-port>`). Do not hardcode a production port without a strong reason.
-
-- Full plan: [`BMis-Desktop-PLAN.md`](./BMis-Desktop-PLAN.md)
-- User guide: [`docs/USER_GUIDE.md`](./docs/USER_GUIDE.md)
-
-## Repository structure
+The intended future BMis command path is:
 
 ```text
-BMis-Desktop/
-├── frontend/          # React + TypeScript UI
-├── python/            # FastAPI sidecar + BMis client
-├── src-tauri/         # Tauri shell and packaging
-├── scripts/           # Python build / package helpers
-├── tests/             # Integration / E2E
+React UI → Tauri IPC → Python backend → BMis TCP client → BMis server
+```
+
+The latter is **target architecture**, not yet a completed end-to-end feature. See [Architecture](docs/ARCHITECTURE.md) for the distinction.
+
+## Repository layout
+
+```text
+.
+├── frontend/                    # React + TypeScript + Vite
+│   └── src-tauri/                # Tauri/Rust host and configuration
+├── python/
+│   ├── bmis_desktop/              # Python IPC entry point and BMis client
+│   ├── tests/                     # Python tests
+│   └── pyproject.toml
+├── scripts/                       # Development helpers
 ├── docs/
-├── BMis-Desktop-PLAN.md
+│   ├── ARCHITECTURE.md
+│   ├── DEVELOPMENT.md
+│   └── USER_GUIDE.md
+├── .github/                       # CI and contribution templates
+├── BMis-Desktop-PLAN.md           # Product/engineering roadmap
+├── CONTRIBUTING.md
+├── SECURITY.md
+├── CHANGELOG.md
 └── README.md
 ```
 
-## Roadmap (summary)
+## Development setup
 
-| Phase | Focus |
-|-------|--------|
-| **V0.1** | Foundation — Tauri + React + Python sidecar, health check, connect + PING |
-| **V0.2** | Connection manager (CRUD, test, secure credentials) |
-| **V0.3** | Key browser (paginated / cursor-based; no full keyspace load) |
-| **V0.4** | Data viewer (STRING, LIST, SET, ZSET, HASH as supported by BMis) |
-| **V0.5** | Key operations (GET/SET/DEL/TTL/… via Python only) |
-| **V0.6** | Command console |
-| **V0.7** | Search and usability |
-| **V0.8** | Server monitoring (only metrics BMis provides) |
-| **V0.9** | Pub/Sub and advanced features (after core is stable) |
-| **V1.0** | Production release — installer, bundled Python, tests, packaging |
+Prerequisites: Python 3.12+, Node.js compatible with the Vite version in `frontend/package.json`, npm, Rust stable/Cargo, and the native Tauri dependencies for your operating system.
 
-**Current priority:** prove the foundation — Tauri launches the bundled Python backend and communicates with an existing BMis instance (PING end-to-end). Do not build the full UI yet.
+### 1. Set up Python
 
-## Security
+From the repository root:
 
-- Never hardcode or commit credentials
-- Store passwords via OS secure credential storage, not plain text
-- Bind the local API to localhost only; validate local API access
-- Minimize Tauri permissions; keep secrets out of logs
-- Prefer TLS for remote BMis when supported
+```bash
+python3 -m venv python/.venv
+python/.venv/bin/python -m pip install --upgrade pip
+python/.venv/bin/python -m pip install pytest
+```
 
-## Performance
+The app currently launches `python/.venv/bin/python` on Linux. This is a development-only assumption; packaged Python sidecar support is still pending.
 
-Designed for large BMis instances: cursor/pagination through Python, virtualized lists, lazy loading, and no blocking work on the UI thread. Never load an entire keyspace into the frontend.
+### 2. Set up the frontend
 
-## Development principles
+```bash
+cd frontend
+npm ci
+```
 
-1. Respect the locked architecture (React/TS → Tauri → Python → BMis).
-2. Do not copy or rewrite the BMis server into this repo.
-3. Prefer vertical slices (UI → Python API → BMis client → test) over layer-by-layer big-bang integration.
-4. Follow milestone order; no scope creep without explicit approval.
-5. A feature is done only when implementation, tests, error handling, docs, and acceptance criteria are complete.
+### 3. Run the desktop app
 
-Before implementing work, check [`BMis-Desktop-PLAN.md`](./BMis-Desktop-PLAN.md) for phase, boundaries, and acceptance criteria.
+From `frontend/`:
 
-## Status
+```bash
+npm run tauri dev
+```
 
-Project setup phase. Application scaffolding (Tauri + React + Python sidecar) is the next step.
+Use **Ping Python** to verify that the UI can communicate with the Python process. A successful response currently looks like:
 
-## Success criteria
+```json
+{"status": true, "message": "BMis python backend is running"}
+```
 
-A developer can install BMis Desktop, connect to BMis, browse and inspect keys, edit values, and run commands without relying on the CLI — as a real desktop product, not a browser wrapped in a window.
+This confirms Python IPC only; it does not verify a connection to the BMis server.
+
+## Tests and checks
+
+Run commands from the repository root unless stated otherwise.
+
+### Python tests
+
+```bash
+python/.venv/bin/python -m pytest -c python/pyproject.toml -q
+```
+
+Integration tests requiring a running BMis server are excluded from the default suite. To run them explicitly, start the compatible BMis server first, then run:
+
+```bash
+python/.venv/bin/python -m pytest -c python/pyproject.toml -q -m integration
+```
+
+### Frontend production build
+
+```bash
+cd frontend
+npm ci
+npm run build
+```
+
+### Rust tests
+
+Create `python/.venv` first because the current Rust tests launch the Python backend through that path. Then run:
+
+```bash
+cargo test --manifest-path frontend/src-tauri/Cargo.toml
+```
+
+Linux builds/tests may require Tauri's native system packages. See [Development](docs/DEVELOPMENT.md).
+
+## Documentation
+
+- [Architecture and current implementation boundaries](docs/ARCHITECTURE.md)
+- [Development setup and test commands](docs/DEVELOPMENT.md)
+- [User guide for the current prototype](docs/USER_GUIDE.md)
+- [Product and engineering roadmap](BMis-Desktop-PLAN.md)
+- [Contributing](CONTRIBUTING.md)
+- [Security reporting and practices](SECURITY.md)
+- [Changelog](CHANGELOG.md)
+
+## Project workflow
+
+Work incrementally through GitHub issues:
+
+1. Issue and acceptance criteria
+2. Design/approach
+3. Implementation
+4. Unit tests and relevant integration tests
+5. Manual verification
+6. Review the diff
+7. Commit and push
+8. Open/update the pull request and close the issue when merged
+
+Use `local-dev` for local work if following the repository's three-branch workflow, merge into `dev`, push `dev`, and open a PR from `dev` to `main`. Do not push `local-dev` to the remote.
+
+## Scope and limitations
+
+Not yet complete: production Python packaging, connection manager UI, BMis server connection from the UI, key browser, data viewer, command console, and production release validation. Track these against `BMis-Desktop-PLAN.md`; do not describe planned functionality as implemented.
