@@ -2,7 +2,7 @@
 
 BMis Desktop is a desktop client prototype for the existing **BMis** server. It is a separate project: it does not reimplement the server or own the server's protocol and data-storage behavior.
 
-> **Current status:** the UI checks the Python backend, connects to one BMis server, sends a command, and shows the server response. **Ping Python** checks the Python process. The live server check is `SET desktop_test Mayur` → `OK` and `GET desktop_test` → `Mayur` on `127.0.0.1:6379`.
+> **Current status:** the UI checks the Python backend, saves named connection profiles, connects to one BMis server, sends a command, and shows the server response. Choosing a profile fills the host and port and does not connect by itself. **Ping Python** checks the Python process. The live server check is `SET desktop_test Mayur` → `OK` and `GET desktop_test` → `Mayur` on `127.0.0.1:6379`.
 
 ## Current stack
 

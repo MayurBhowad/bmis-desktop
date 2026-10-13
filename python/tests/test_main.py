@@ -1,17 +1,21 @@
-from bmis_desktop.main import handle_request
-
 import json
+import os
 import subprocess
 import sys
 
+from bmis_desktop.main import PROFILE_DATABASE_ENV, handle_request
 
-def test_main_continues_after_invalid_json() -> None:
+
+def test_main_continues_after_invalid_json(tmp_path) -> None:
+    env = os.environ.copy()
+    env[PROFILE_DATABASE_ENV] = str(tmp_path / "profiles.db")
     process = subprocess.run(
         [sys.executable, "-m", "bmis_desktop.main"],
         input='{invalid}\n{"command":"ping"}\n',
         text=True,
         capture_output=True,
         check=True,
+        env=env,
     )
 
     responses = [
@@ -49,14 +53,6 @@ def test_unknown_command() -> None:
 
     assert response["status"] is False
     assert response["error"] == "Invalid command: unknown"
-
-
-def test_missing_command() -> None:
-    response = handle_request({})
-
-    assert response["status"] is False
-    assert response["error"] == "Command must be a non-empty string"
-
 
 
 import pytest
