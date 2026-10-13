@@ -1,18 +1,15 @@
 import { useRef, useState, type FormEvent } from 'react';
-import { invoke } from '@tauri-apps/api/core';
 import './App.css';
-
-type PythonCommand =
-  | { command: 'ping' }
-  | { command: 'connect'; host: string; port: number }
-  | { command: 'status' }
-  | { command: 'execute'; request: string }
-  | { command: 'disconnect' };
-
-type ParsedPythonResponse = {
-  raw: string;
-  body: unknown;
-};
+import { ConnectionProfiles } from './ConnectionProfiles';
+import {
+  failureMessage,
+  invokeErrorMessage,
+  isRecord,
+  parsePort,
+  pythonRequest,
+  type PythonCommand,
+} from './pythonApi';
+import type { ConnectionProfile } from './profiles';
 
 type ConnectionState = {
   connected: boolean;
@@ -28,58 +25,8 @@ const DISCONNECTED: ConnectionState = {
   port: null,
 };
 
-const MIN_PORT = 1;
-const MAX_PORT = 65535;
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function invokeErrorMessage(error: unknown): string {
-  if (typeof error === 'string' && error.trim()) {
-    return error;
-  }
-  if (error instanceof Error && error.message.trim()) {
-    return error.message;
-  }
-  return 'Unable to reach the Python backend';
-}
-
-function backendErrorMessage(body: Record<string, unknown>): string {
-  const message = body.error;
-  if (typeof message === 'string' && message.trim()) {
-    return message;
-  }
-  return 'Backend request failed';
-}
-
-function failureMessage(body: unknown): string | null {
-  if (!isRecord(body)) {
-    return 'Backend returned an unexpected response';
-  }
-  if (body.status === false) {
-    return backendErrorMessage(body);
-  }
-  if (body.status !== true) {
-    return 'Backend returned an unexpected response';
-  }
-  return null;
-}
-
 function formatResponse(body: unknown): string {
   return JSON.stringify(body, null, 2);
-}
-
-function parsePort(value: string): number | null {
-  const trimmed = value.trim();
-  if (!/^[0-9]+$/.test(trimmed)) {
-    return null;
-  }
-  const port = Number(trimmed);
-  if (!Number.isInteger(port) || port < MIN_PORT || port > MAX_PORT) {
-    return null;
-  }
-  return port;
 }
 
 function isPortNumber(value: unknown): value is number {
@@ -109,27 +56,6 @@ function connectionSummary(state: ConnectionState): string {
   return 'Disconnected';
 }
 
-async function pythonRequest(payload: PythonCommand): Promise<ParsedPythonResponse> {
-  let raw: string;
-  try {
-    raw = await invoke<string>('python_request', {
-      request: JSON.stringify(payload),
-    });
-  } catch (error) {
-    throw new Error(invokeErrorMessage(error));
-  }
-
-  if (typeof raw !== 'string') {
-    throw new Error('Backend returned an unexpected response');
-  }
-
-  try {
-    return { raw, body: JSON.parse(raw) };
-  } catch {
-    throw new Error('Backend returned malformed JSON');
-  }
-}
-
 function App() {
   const [pingLoading, setPingLoading] = useState(false);
   const [pingResponse, setPingResponse] = useState('');
@@ -137,6 +63,7 @@ function App() {
 
   const [host, setHost] = useState('127.0.0.1');
   const [port, setPort] = useState('6379');
+  const [selectedProfileId, setSelectedProfileId] = useState<string | null>(null);
   const [connection, setConnection] = useState<ConnectionState>(DISCONNECTED);
   const [connectionLoading, setConnectionLoading] = useState<ConnectionAction | null>(null);
   const [connectionMessage, setConnectionMessage] = useState('');
@@ -220,6 +147,17 @@ function App() {
     } catch {
       // Keep the execute error already shown. A failed status query must not replace it.
     }
+  };
+
+  const handleSelectProfile = (profile: ConnectionProfile) => {
+    setSelectedProfileId(profile.id);
+    setHost(profile.host);
+    setPort(String(profile.port));
+    setConnectionError('');
+  };
+
+  const handleProfileDeleted = (id: string) => {
+    setSelectedProfileId((current) => (current === id ? null : current));
   };
 
   const handleConnect = (event: FormEvent<HTMLFormElement>) => {
@@ -307,6 +245,14 @@ function App() {
         )}
       </section>
 
+      <ConnectionProfiles
+        selectedId={selectedProfileId}
+        suggestedHost={host}
+        suggestedPort={port}
+        onSelect={handleSelectProfile}
+        onDeleted={handleProfileDeleted}
+      />
+
       <section className="panel" aria-labelledby="connection-heading">
         <div className="panel-heading">
           <h2 id="connection-heading">BMis server</h2>
@@ -330,7 +276,10 @@ function App() {
               autoComplete="off"
               spellCheck={false}
               disabled={inputsDisabled}
-              onChange={(event) => setHost(event.target.value)}
+              onChange={(event) => {
+                setHost(event.target.value);
+                setSelectedProfileId(null);
+              }}
             />
           </label>
           <label htmlFor="bmis-port">
@@ -344,7 +293,10 @@ function App() {
               autoComplete="off"
               spellCheck={false}
               disabled={inputsDisabled}
-              onChange={(event) => setPort(event.target.value)}
+              onChange={(event) => {
+                setPort(event.target.value);
+                setSelectedProfileId(null);
+              }}
             />
           </label>
           <button type="submit" disabled={inputsDisabled} aria-busy={connectionLoading === 'connect'}>
