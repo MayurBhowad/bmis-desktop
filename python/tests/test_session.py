@@ -1,5 +1,6 @@
 import io
 import json
+import os
 import socket
 import subprocess
 import sys
@@ -9,7 +10,8 @@ from typing import Self
 import pytest
 
 from bmis_desktop.bmis.client import BMisClient
-from bmis_desktop.main import handle_request, main
+from bmis_desktop.main import PROFILE_DATABASE_ENV, handle_backend_request, handle_request, main
+from bmis_desktop.profiles import ConnectionProfileRepository
 from bmis_desktop.session import BackendSession
 
 
@@ -688,7 +690,9 @@ def test_session_close_is_safe_and_idempotent() -> None:
 def test_main_closes_the_session_when_stdin_ends(
     monkeypatch: pytest.MonkeyPatch,
     capsys: pytest.CaptureFixture[str],
+    tmp_path,
 ) -> None:
+    monkeypatch.setenv(PROFILE_DATABASE_ENV, str(tmp_path / "profiles.db"))
     class TrackingSession(BackendSession):
         def __init__(self) -> None:
             super().__init__()
@@ -732,7 +736,7 @@ def test_main_closes_the_session_when_stdin_ends(
         assert server.error is None
 
 
-def test_main_stdout_carries_only_json_lines() -> None:
+def test_main_stdout_carries_only_json_lines(tmp_path) -> None:
     with MockBMisServer() as server:
         payload = "\n".join(
             [
@@ -749,12 +753,15 @@ def test_main_stdout_carries_only_json_lines() -> None:
                 json.dumps({"command": "status"}),
             ]
         ) + "\n"
+        env = os.environ.copy()
+        env[PROFILE_DATABASE_ENV] = str(tmp_path / "profiles.db")
         process = subprocess.run(
             [sys.executable, "-m", "bmis_desktop.main"],
             input=payload,
             text=True,
             capture_output=True,
             check=False,
+            env=env,
         )
 
         assert process.returncode == 0
@@ -789,6 +796,50 @@ def test_main_stdout_carries_only_json_lines() -> None:
             },
         ]
         assert server.client_closed.wait(2)
+
+
+def test_profile_commands_keep_the_existing_connection(tmp_path) -> None:
+    repository = ConnectionProfileRepository(tmp_path / "profiles.db")
+    with MockBMisServer() as server:
+        session = BackendSession(client_factory=_fast_client)
+        try:
+            connected = handle_backend_request(
+                _connect_request(server.host, server.port),
+                session,
+                repository,
+            )
+            assert connected["status"] is True
+            assert connected["connected"] is True
+
+            saved = handle_backend_request(
+                {
+                    "command": "create_profile",
+                    "name": "Local",
+                    "host": server.host,
+                    "port": server.port,
+                },
+                session,
+                repository,
+            )
+            assert saved["status"] is True
+
+            ping = handle_backend_request({"command": "ping"}, session, repository)
+            assert ping == {
+                "status": True,
+                "message": "BMis python backend is running",
+            }
+            stored = handle_backend_request(
+                {"command": "execute", "request": "SET desktop_test Mayur"},
+                session,
+                repository,
+            )
+            assert stored == {"status": True, "result": "OK"}
+            status = handle_backend_request({"command": "status"}, session, repository)
+            assert status["connected"] is True
+            assert server.commands == ["SET desktop_test Mayur"]
+            assert server.error is None
+        finally:
+            session.close()
 
 
 def test_handle_request_hides_unexpected_exceptions(monkeypatch: pytest.MonkeyPatch) -> None:

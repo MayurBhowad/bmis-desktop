@@ -2,9 +2,9 @@
 
 ## Current prototype status
 
-This guide describes the **current prototype**, not the full future product. The UI can check the Python backend, connect to one BMis server, send one command, and show the server's decoded response.
+This guide describes the **current prototype**, not the full future product. The UI can check the Python backend, save connection profiles, connect to one BMis server, send one command, and show the server's decoded response.
 
-**Ping Python** checks the desktop Python process. The **BMis server** panel is the server connection. The **Command console** sends the text you type as a raw BMis command.
+**Ping Python** checks the desktop Python process. **Saved profiles** stores a name, host, and port. The **BMis server** panel is the server connection. The **Command console** sends the text you type as a raw BMis command.
 
 ## Run the prototype
 
@@ -16,7 +16,7 @@ From the `frontend/` directory:
 npm run tauri dev
 ```
 
-The window should show **BMis Desktop**, **Python backend**, **BMis server**, and **Command console**.
+The window should show **BMis Desktop**, **Python backend**, **Saved profiles**, **BMis server**, and **Command console**.
 
 ## Verify Python IPC
 
@@ -32,6 +32,18 @@ The window should show **BMis Desktop**, **Python backend**, **BMis server**, an
 ```
 
 This confirms the UI → Tauri command → Python process → Tauri result → UI path. It does not confirm BMis server availability.
+
+## Save a connection profile
+
+Profiles remember a name, hostname or IP, and port. They do not store a password.
+
+1. In **Saved profiles**, click **New profile**.
+2. Enter a name, hostname or IP, and port, then click **Save profile**.
+3. Click a saved profile to fill the **BMis server** host and port. That does not connect.
+4. Click **Edit** to change a saved profile, or **Delete** and then **Delete profile** to remove it. **Cancel** leaves the profile in place.
+5. You can still type a host and port directly and click **Connect** without using a saved profile.
+
+An empty name, empty host, or port outside 1 through 65535 is shown as an error and is not sent. A backend failure stays on the page. While a profile request is running, its action stays disabled so it cannot be submitted twice.
 
 ## Connect and run a command
 
@@ -62,7 +74,7 @@ Invalid host or port, a refused connection, a timeout, and a server error stay i
 
 - The Python executable is currently expected at `python/.venv/bin/python` on Linux development setups.
 - Packaged Python sidecar/runtime support is not yet implemented.
-- Saved connections, credentials, key browser, data viewer, and server monitoring are not implemented in the current prototype.
+- Credentials, key browser, data viewer, and server monitoring are not implemented in the current prototype.
 - Cross-platform installer and release behavior have not yet been validated.
 
 See [BMis-Desktop-PLAN.md](../BMis-Desktop-PLAN.md) for the planned product roadmap and [Architecture](ARCHITECTURE.md) for current versus target architecture.
