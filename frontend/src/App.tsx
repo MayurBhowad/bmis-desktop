@@ -218,153 +218,209 @@ function App() {
     })();
   };
 
+  const pythonState = pingLoading
+    ? { label: 'Checking', tone: 'pending' }
+    : pingError
+      ? { label: 'Error', tone: 'error' }
+      : pingResponse
+        ? { label: 'Online', tone: 'ok' }
+        : { label: 'Not checked', tone: 'idle' };
+
   return (
-    <main className="app">
-      <header className="header">
-        <h1>BMis Desktop</h1>
-        <p>Connect to a BMis server and run commands through the local Python backend.</p>
-      </header>
+    <div className="shell">
+      <aside className="sidebar">
+        <header className="brand">
+          <span className="brand-mark" aria-hidden="true">
+            B
+          </span>
+          <div>
+            <h1>BMis Desktop</h1>
+            <p className="hint">Client for the BMis server</p>
+          </div>
+        </header>
 
-      <section className="panel" aria-labelledby="python-heading">
-        <div className="panel-heading">
-          <h2 id="python-heading">Python backend</h2>
+        <section className="side-section" aria-labelledby="python-heading">
+          <div className="side-heading">
+            <h2 id="python-heading">Python backend</h2>
+            <span className={`pill pill-${pythonState.tone}`}>{pythonState.label}</span>
+          </div>
           <p className="hint">Health check for the desktop Python process.</p>
-        </div>
-        <button type="button" onClick={() => void sendPing()} disabled={pingLoading} aria-busy={pingLoading}>
-          {pingLoading ? 'Pinging...' : 'Ping Python'}
-        </button>
-        {pingError && (
-          <p className="error" role="alert">
-            {pingError}
-          </p>
-        )}
-        {pingResponse && (
-          <pre className="output" aria-label="Python backend response">
-            {pingResponse}
-          </pre>
-        )}
-      </section>
-
-      <ConnectionProfiles
-        selectedId={selectedProfileId}
-        suggestedHost={host}
-        suggestedPort={port}
-        onSelect={handleSelectProfile}
-        onDeleted={handleProfileDeleted}
-      />
-
-      <section className="panel" aria-labelledby="connection-heading">
-        <div className="panel-heading">
-          <h2 id="connection-heading">BMis server</h2>
-          <p
-            className={connection.connected ? 'status status-connected' : 'status status-disconnected'}
-            role="status"
-            aria-live="polite"
-          >
-            {connection.connected ? 'Connected' : 'Disconnected'}
-          </p>
-        </div>
-
-        <form className="connection-form" onSubmit={handleConnect}>
-          <label htmlFor="bmis-host">
-            Hostname or IP
-            <input
-              id="bmis-host"
-              name="host"
-              type="text"
-              value={host}
-              autoComplete="off"
-              spellCheck={false}
-              disabled={inputsDisabled}
-              onChange={(event) => {
-                setHost(event.target.value);
-                setSelectedProfileId(null);
-              }}
-            />
-          </label>
-          <label htmlFor="bmis-port">
-            Port
-            <input
-              id="bmis-port"
-              name="port"
-              type="text"
-              inputMode="numeric"
-              value={port}
-              autoComplete="off"
-              spellCheck={false}
-              disabled={inputsDisabled}
-              onChange={(event) => {
-                setPort(event.target.value);
-                setSelectedProfileId(null);
-              }}
-            />
-          </label>
-          <button type="submit" disabled={inputsDisabled} aria-busy={connectionLoading === 'connect'}>
-            {connectionLoading === 'connect' ? 'Connecting...' : 'Connect'}
-          </button>
-        </form>
-
-        <div className="actions">
           <button
             type="button"
-            onClick={() => void runConnection('status', { command: 'status' })}
-            disabled={connectionLoading !== null}
-            aria-busy={connectionLoading === 'status'}
+            className="block"
+            onClick={() => void sendPing()}
+            disabled={pingLoading}
+            aria-busy={pingLoading}
           >
-            {connectionLoading === 'status' ? 'Refreshing...' : 'Refresh Status'}
+            {pingLoading ? 'Pinging...' : 'Ping Python'}
           </button>
-          <button
-            type="button"
-            onClick={() => void runConnection('disconnect', { command: 'disconnect' })}
-            disabled={connectionLoading !== null}
-            aria-busy={connectionLoading === 'disconnect'}
-          >
-            {connectionLoading === 'disconnect' ? 'Disconnecting...' : 'Disconnect'}
-          </button>
-        </div>
+          {pingError && (
+            <p className="error" role="alert">
+              {pingError}
+            </p>
+          )}
+          {pingResponse && (
+            <pre className="output output-compact" aria-label="Python backend response">
+              {pingResponse}
+            </pre>
+          )}
+        </section>
 
-        {connectionMessage && <p className="notice">{connectionMessage}</p>}
-        {connectionError && (
-          <p className="error" id="connection-error" role="alert">
-            {connectionError}
-          </p>
-        )}
-      </section>
+        <ConnectionProfiles
+          selectedId={selectedProfileId}
+          suggestedHost={host}
+          suggestedPort={port}
+          onSelect={handleSelectProfile}
+          onDeleted={handleProfileDeleted}
+        />
+      </aside>
 
-      <section className="panel" aria-labelledby="console-heading">
-        <div className="panel-heading">
-          <h2 id="console-heading">Command console</h2>
-          <p className="hint">Try SET demo Mayur, then GET demo.</p>
-        </div>
-        <form className="command-form" onSubmit={handleExecute}>
-          <label htmlFor="bmis-command">
-            Command
-            <input
-              id="bmis-command"
-              name="command"
-              type="text"
-              value={command}
-              autoComplete="off"
-              spellCheck={false}
-              placeholder="SET demo Mayur"
-              disabled={!commandEnabled}
-              onChange={(event) => setCommand(event.target.value)}
-            />
-          </label>
-          <button type="submit" disabled={!commandEnabled} aria-busy={commandLoading}>
-            {commandLoading ? 'Executing...' : 'Execute'}
-          </button>
-        </form>
-        {commandError && (
-          <p className="error" role="alert">
-            {commandError}
-          </p>
-        )}
-        <pre className="output" aria-label="Command output" aria-live="polite">
-          {commandOutput || 'Command output will appear here.'}
-        </pre>
-      </section>
-    </main>
+      <main className="workspace">
+        <section className="panel" aria-labelledby="connection-heading">
+          <div className="panel-heading">
+            <div className="panel-title">
+              <h2 id="connection-heading">BMis server</h2>
+              <p className="hint">
+                {connectionMessage || 'Choose a saved profile or enter a host and port.'}
+              </p>
+            </div>
+            <p
+              className={connection.connected ? 'status status-connected' : 'status status-disconnected'}
+              role="status"
+              aria-live="polite"
+            >
+              {connection.connected ? 'Connected' : 'Disconnected'}
+            </p>
+          </div>
+
+          <div className="connection-row">
+            <form className="connection-form" onSubmit={handleConnect}>
+              <label htmlFor="bmis-host">
+                Hostname or IP
+                <input
+                  id="bmis-host"
+                  name="host"
+                  type="text"
+                  value={host}
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={inputsDisabled}
+                  onChange={(event) => {
+                    setHost(event.target.value);
+                    setSelectedProfileId(null);
+                  }}
+                />
+              </label>
+              <label htmlFor="bmis-port">
+                Port
+                <input
+                  id="bmis-port"
+                  name="port"
+                  type="text"
+                  inputMode="numeric"
+                  value={port}
+                  autoComplete="off"
+                  spellCheck={false}
+                  disabled={inputsDisabled}
+                  onChange={(event) => {
+                    setPort(event.target.value);
+                    setSelectedProfileId(null);
+                  }}
+                />
+              </label>
+              <button
+                type="submit"
+                className="primary"
+                disabled={inputsDisabled}
+                aria-busy={connectionLoading === 'connect'}
+              >
+                {connectionLoading === 'connect' ? 'Connecting...' : 'Connect'}
+              </button>
+            </form>
+
+            <div className="actions">
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => void runConnection('status', { command: 'status' })}
+                disabled={connectionLoading !== null}
+                aria-busy={connectionLoading === 'status'}
+              >
+                {connectionLoading === 'status' ? 'Refreshing...' : 'Refresh Status'}
+              </button>
+              <button
+                type="button"
+                className="secondary"
+                onClick={() => void runConnection('disconnect', { command: 'disconnect' })}
+                disabled={connectionLoading !== null}
+                aria-busy={connectionLoading === 'disconnect'}
+              >
+                {connectionLoading === 'disconnect' ? 'Disconnecting...' : 'Disconnect'}
+              </button>
+            </div>
+          </div>
+
+          {connectionError && (
+            <p className="error" id="connection-error" role="alert">
+              {connectionError}
+            </p>
+          )}
+        </section>
+
+        <section className="panel console" aria-labelledby="console-heading">
+          <div className="panel-heading">
+            <div className="panel-title">
+              <h2 id="console-heading">Command console</h2>
+              <p className="hint">Try SET demo Mayur, then GET demo.</p>
+            </div>
+            {connection.connected && (
+              <span className="target">
+                {connection.host}:{connection.port}
+              </span>
+            )}
+          </div>
+          <form className="command-form" onSubmit={handleExecute}>
+            <label htmlFor="bmis-command" className="prompt">
+              <span className="sr-only">Command</span>
+              <span className="prompt-symbol" aria-hidden="true">
+                &gt;
+              </span>
+              <input
+                id="bmis-command"
+                name="command"
+                type="text"
+                value={command}
+                autoComplete="off"
+                spellCheck={false}
+                placeholder={connection.connected ? 'SET demo Mayur' : 'Connect to a server to run commands'}
+                disabled={!commandEnabled}
+                onChange={(event) => setCommand(event.target.value)}
+              />
+            </label>
+            <button type="submit" className="primary" disabled={!commandEnabled} aria-busy={commandLoading}>
+              {commandLoading ? 'Executing...' : 'Execute'}
+            </button>
+          </form>
+          {commandError && (
+            <p className="error" role="alert">
+              {commandError}
+            </p>
+          )}
+          <div className="output-frame">
+            <div className="output-bar" aria-hidden="true">
+              Response
+            </div>
+            <pre
+              className={commandOutput ? 'output output-fill' : 'output output-fill output-empty'}
+              aria-label="Command output"
+              aria-live="polite"
+            >
+              {commandOutput || 'Command output will appear here.'}
+            </pre>
+          </div>
+        </section>
+      </main>
+    </div>
   );
 }
 

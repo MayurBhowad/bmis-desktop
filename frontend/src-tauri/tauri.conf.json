@@ -13,8 +13,8 @@
     "windows": [
       {
         "title": "BMis Desktop",
-        "width": 800,
-        "height": 600,
+        "width": 1100,
+        "height": 680,
         "resizable": true,
         "fullscreen": false
       }
