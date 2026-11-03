@@ -233,11 +233,12 @@ export function ConnectionProfiles({
   const actionsLocked = busy || mode.type !== 'idle';
 
   return (
-    <section className="panel" aria-labelledby="profiles-heading" aria-busy={busy}>
-      <div className="panel-heading">
+    <section className="side-section profiles" aria-labelledby="profiles-heading" aria-busy={busy}>
+      <div className="side-heading">
         <h2 id="profiles-heading">Saved profiles</h2>
-        <p className="hint">Choosing a profile fills the host and port below. It does not connect.</p>
+        {profiles.length > 0 && <span className="pill pill-idle">{profiles.length}</span>}
       </div>
+      <p className="hint">Choosing a profile fills the host and port. It does not connect.</p>
 
       {listState === 'loading' && (
         <p className="notice" role="status">
@@ -310,7 +311,8 @@ export function ConnectionProfiles({
 
       {mode.type === 'idle' && listState !== 'loading' && (
         <div className="actions">
-          <button type="button" onClick={startCreate} disabled={busy}>
+          <button type="button" className="block dashed" onClick={startCreate} disabled={busy}>
+            <span aria-hidden="true">+</span>
             New profile
           </button>
         </div>
@@ -378,6 +380,7 @@ export function ConnectionProfiles({
           <div className="actions">
             <button
               type="submit"
+              className="primary"
               disabled={busy}
               aria-busy={operation === 'create' || operation === 'update'}
             >

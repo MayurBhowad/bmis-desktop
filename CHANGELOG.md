@@ -20,6 +20,10 @@ The project has not published a production release yet. Entries below summarize 
 - Project architecture, development, contributing, and security documentation.
 - CI workflow for Python tests, frontend build, and Rust tests.
 
+### Changed
+
+- Desktop UI layout redesign (#19): full-window shell with a sidebar for Python backend status and saved profiles, a connection bar, and a console whose output fills the remaining space. Light and dark themes, narrow-window stacking, and a larger default window. Presentation only; IPC and connection behavior are unchanged.
+
 ### Fixed
 
 - Correct distinction between incomplete protocol responses and a legitimate null response.
