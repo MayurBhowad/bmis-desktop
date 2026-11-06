@@ -1,6 +1,15 @@
 import { useRef, useState, type FormEvent } from 'react';
 import './App.css';
+import {
+  addToHistory,
+  commandSuggestions,
+  executeBmisCommand,
+  formatResponse,
+  runExclusive,
+  type CommandResult,
+} from './commandBuilder';
 import { ConnectionProfiles } from './ConnectionProfiles';
+import { QuickActions } from './QuickActions';
 import {
   failureMessage,
   invokeErrorMessage,
@@ -24,10 +33,6 @@ const DISCONNECTED: ConnectionState = {
   host: null,
   port: null,
 };
-
-function formatResponse(body: unknown): string {
-  return JSON.stringify(body, null, 2);
-}
 
 function isPortNumber(value: unknown): value is number {
   return typeof value === 'number' && Number.isInteger(value);
@@ -73,13 +78,17 @@ function App() {
   const [commandLoading, setCommandLoading] = useState(false);
   const [commandOutput, setCommandOutput] = useState('');
   const [commandError, setCommandError] = useState('');
+  // Session-only: SET values can be sensitive, so history is never persisted.
+  const [history, setHistory] = useState<string[]>([]);
 
   const pingRequest = useRef(false);
   const connectionRequest = useRef(false);
   const commandRequest = useRef(false);
+  const commandInput = useRef<HTMLInputElement>(null);
 
   const inputsDisabled = connection.connected || connectionLoading !== null;
   const commandEnabled = connection.connected && connectionLoading === null && !commandLoading;
+  const suggestions = commandSuggestions(command, history);
 
   const sendPing = async () => {
     if (pingRequest.current) {
@@ -184,6 +193,28 @@ function App() {
     });
   };
 
+  const runCommand = async (request: string): Promise<CommandResult | null> => {
+    if (commandRequest.current || !connection.connected) {
+      return null;
+    }
+    setCommandLoading(true);
+    setCommandError('');
+    try {
+      return await runExclusive(commandRequest, async () => {
+        setHistory((current) => addToHistory(current, request));
+        const result = await executeBmisCommand(request);
+        setCommandOutput(result.output);
+        setCommandError(result.error);
+        if (result.backendFailure) {
+          await refreshConnectionAfterExecuteFailure();
+        }
+        return result;
+      });
+    } finally {
+      setCommandLoading(false);
+    }
+  };
+
   const handleExecute = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (commandRequest.current || !connection.connected) {
@@ -193,29 +224,13 @@ function App() {
       setCommandError('Enter a command before executing.');
       return;
     }
-    commandRequest.current = true;
-    setCommandLoading(true);
+    void runCommand(command);
+  };
+
+  const applySuggestion = (value: string) => {
+    setCommand(value);
     setCommandError('');
-    void (async () => {
-      try {
-        const parsed = await pythonRequest({
-          command: 'execute',
-          request: command,
-        });
-        setCommandOutput(formatResponse(parsed.body));
-        const failure = failureMessage(parsed.body);
-        setCommandError(failure ?? '');
-        if (failure) {
-          await refreshConnectionAfterExecuteFailure();
-        }
-      } catch (error) {
-        setCommandOutput('');
-        setCommandError(error instanceof Error ? error.message : invokeErrorMessage(error));
-      } finally {
-        commandRequest.current = false;
-        setCommandLoading(false);
-      }
-    })();
+    commandInput.current?.focus();
   };
 
   const pythonState = pingLoading
@@ -367,6 +382,8 @@ function App() {
           )}
         </section>
 
+        <QuickActions enabled={commandEnabled} onRun={runCommand} />
+
         <section className="panel console" aria-labelledby="console-heading">
           <div className="panel-heading">
             <div className="panel-title">
@@ -386,6 +403,7 @@ function App() {
                 &gt;
               </span>
               <input
+                ref={commandInput}
                 id="bmis-command"
                 name="command"
                 type="text"
@@ -401,6 +419,46 @@ function App() {
               {commandLoading ? 'Executing...' : 'Execute'}
             </button>
           </form>
+          {connection.connected && (suggestions.length > 0 || history.length > 0) && (
+            <div className="suggestions">
+              {suggestions.length > 0 && (
+                <>
+                  <span className="suggestion-label" id="suggestions-label">
+                    Suggestions
+                  </span>
+                  <div className="suggestion-list" role="group" aria-labelledby="suggestions-label">
+                    {suggestions.map((suggestion) => (
+                      <button
+                        key={`${suggestion.kind}:${suggestion.value}`}
+                        type="button"
+                        className={suggestion.kind === 'template' ? 'chip chip-template' : 'chip'}
+                        title={suggestion.label}
+                        aria-label={
+                          suggestion.kind === 'template'
+                            ? `Insert ${suggestion.value.trim()} template`
+                            : `Use recent command ${suggestion.label}`
+                        }
+                        disabled={!commandEnabled}
+                        onClick={() => applySuggestion(suggestion.value)}
+                      >
+                        {suggestion.label}
+                      </button>
+                    ))}
+                  </div>
+                </>
+              )}
+              {history.length > 0 && (
+                <button
+                  type="button"
+                  className="secondary chip-clear"
+                  disabled={!commandEnabled}
+                  onClick={() => setHistory([])}
+                >
+                  Clear history
+                </button>
+              )}
+            </div>
+          )}
           {commandError && (
             <p className="error" role="alert">
               {commandError}

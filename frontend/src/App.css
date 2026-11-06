@@ -372,6 +372,58 @@ button.dashed {
   font-size: 0.85rem;
 }
 
+/* Quick actions */
+
+.quick-actions {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(17rem, 1fr));
+  gap: 0.75rem;
+}
+
+.quick-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding: 0.85rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.quick-form h3 {
+  font-size: 0.95rem;
+  font-weight: 650;
+}
+
+.quick-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(9rem, 1fr));
+  gap: 0.65rem;
+}
+
+.quick-fields input[aria-invalid='true'] {
+  border-color: var(--danger-border);
+}
+
+.quick-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.6rem;
+  margin-top: auto;
+}
+
+.quick-footer button {
+  min-width: 7.5rem;
+}
+
+.command-preview {
+  min-width: 0;
+  color: var(--text-muted);
+  font: 0.78rem/1.4 var(--mono);
+  word-break: break-all;
+}
+
 /* Console */
 
 .console {
@@ -418,6 +470,53 @@ button.dashed {
 
 .command-form button {
   min-width: 6.5rem;
+}
+
+.suggestions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.6rem;
+  margin-top: -0.25rem;
+}
+
+.suggestion-label {
+  color: var(--text-muted);
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.suggestion-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+  min-width: 0;
+}
+
+.chip {
+  display: inline-block;
+  max-width: 18rem;
+  min-height: 1.85rem;
+  padding: 0.25rem 0.6rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font: 500 0.78rem/1.4 var(--mono);
+}
+
+.chip-template {
+  border-style: dashed;
+  border-color: var(--border-strong);
+  background: transparent;
+  color: var(--text);
+}
+
+.chip-clear {
+  min-height: 1.85rem;
+  margin-left: auto;
+  padding: 0.2rem 0.6rem;
+  font-size: 0.75rem;
 }
 
 .output-frame {
