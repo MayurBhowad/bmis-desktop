@@ -1,14 +1,15 @@
 import { useRef, useState, type FormEvent } from 'react';
 import './App.css';
+import { commandSuggestions, formatResponse, runExclusive, type CommandResult } from './commandBuilder';
 import {
-  addToHistory,
-  commandSuggestions,
-  executeBmisCommand,
-  formatResponse,
-  runExclusive,
-  type CommandResult,
-} from './commandBuilder';
+  addHistoryRecord,
+  clearHistory,
+  executeAndRecord,
+  recentCommands,
+  type HistoryRecord,
+} from './commandHistory';
 import { ConnectionProfiles } from './ConnectionProfiles';
+import { HistoryBrowser } from './HistoryBrowser';
 import { QuickActions } from './QuickActions';
 import {
   failureMessage,
@@ -79,16 +80,18 @@ function App() {
   const [commandOutput, setCommandOutput] = useState('');
   const [commandError, setCommandError] = useState('');
   // Session-only: SET values can be sensitive, so history is never persisted.
-  const [history, setHistory] = useState<string[]>([]);
+  const [history, setHistory] = useState<HistoryRecord[]>(clearHistory);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   const pingRequest = useRef(false);
   const connectionRequest = useRef(false);
   const commandRequest = useRef(false);
   const commandInput = useRef<HTMLInputElement>(null);
+  const historyId = useRef(0);
 
   const inputsDisabled = connection.connected || connectionLoading !== null;
   const commandEnabled = connection.connected && connectionLoading === null && !commandLoading;
-  const suggestions = commandSuggestions(command, history);
+  const suggestions = commandSuggestions(command, recentCommands(history));
 
   const sendPing = async () => {
     if (pingRequest.current) {
@@ -201,8 +204,11 @@ function App() {
     setCommandError('');
     try {
       return await runExclusive(commandRequest, async () => {
-        setHistory((current) => addToHistory(current, request));
-        const result = await executeBmisCommand(request);
+        const result = await executeAndRecord(
+          request,
+          (record) => setHistory((current) => addHistoryRecord(current, record)),
+          { nextId: () => (historyId.current += 1) },
+        );
         setCommandOutput(result.output);
         setCommandError(result.error);
         if (result.backendFailure) {
@@ -390,11 +396,21 @@ function App() {
               <h2 id="console-heading">Command console</h2>
               <p className="hint">Try SET demo Mayur, then GET demo.</p>
             </div>
-            {connection.connected && (
-              <span className="target">
-                {connection.host}:{connection.port}
-              </span>
-            )}
+            <div className="actions">
+              {connection.connected && (
+                <span className="target">
+                  {connection.host}:{connection.port}
+                </span>
+              )}
+              <button
+                type="button"
+                className="secondary"
+                aria-haspopup="dialog"
+                onClick={() => setHistoryOpen(true)}
+              >
+                History{history.length > 0 && ` (${history.length})`}
+              </button>
+            </div>
           </div>
           <form className="command-form" onSubmit={handleExecute}>
             <label htmlFor="bmis-command" className="prompt">
@@ -452,7 +468,7 @@ function App() {
                   type="button"
                   className="secondary chip-clear"
                   disabled={!commandEnabled}
-                  onClick={() => setHistory([])}
+                  onClick={() => setHistory(clearHistory())}
                 >
                   Clear history
                 </button>
@@ -478,6 +494,15 @@ function App() {
           </div>
         </section>
       </main>
+
+      <HistoryBrowser
+        open={historyOpen}
+        history={history}
+        canReuse={commandEnabled}
+        onReuse={applySuggestion}
+        onClear={() => setHistory(clearHistory())}
+        onClose={() => setHistoryOpen(false)}
+      />
     </div>
   );
 }
