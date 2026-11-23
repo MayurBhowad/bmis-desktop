@@ -6,7 +6,7 @@ from bmis_desktop.bmis.client import BMisClient
 from bmis_desktop.bmis.protocol import ProtocolError
 
 _PING_MESSAGE = "BMis python backend is running"
-_STATEFUL_COMMANDS = {"connect", "status", "execute", "disconnect"}
+_STATEFUL_COMMANDS = {"connect", "status", "execute", "disconnect", "list_keys"}
 _HOST_PATTERN = re.compile(r"[A-Za-z0-9.:\[\]-]+")
 _MAX_HOST_LENGTH = 255
 _MIN_PORT = 1
@@ -118,6 +118,9 @@ class BackendSession:
 
         if command == "disconnect":
             return self._disconnect()
+
+        if command == "list_keys":
+            return self._list_keys(request)
 
         return error_response(f"Invalid command: {command}")
 
@@ -247,6 +250,73 @@ class BackendSession:
             client.close()
         except Exception:  # noqa: BLE001 - failed connects must still release the socket.
             return
+
+
+    def _list_keys(self, request: dict[str, object]) -> dict[str, object]:
+        cursor = request.get("cursor", "0")
+        count = request.get("count", 50)
+
+        if (
+            not isinstance(cursor, str)
+            or re.fullmatch(r"(0|[1-9]\d*)", cursor) is None
+            or not cursor.isascii()
+            or len(cursor) > 16
+            or int(cursor) > 9_007_199_254_740_991
+        ):
+            return error_response("Invalid scan cursor")
+
+        if isinstance(count, bool) or not isinstance(count, int):
+            return error_response("Count must be an integer between 1 and 100")
+
+        if count < 1 or count > 100:
+            return error_response("Count must be an integer between 1 and 100")
+
+        client = self._connected_client()
+        if client is None:
+            return error_response("Not connected to BMis")
+
+        try:
+            result = client.execute(f"SCAN {cursor} COUNT {count}")
+
+            # Server command errors, such as expired cursors, do not
+            # require closing the TCP connection.
+            if isinstance(result, str):
+                return error_response(result)
+
+        except (UnicodeDecodeError, ProtocolError):
+            return self._fail_execution("Invalid BMis response")
+        except TimeoutError:
+            return self._fail_execution("Timed out waiting for BMis response")
+        except ConnectionError:
+            return self._fail_execution("BMis server closed the connection")
+        except OSError:
+            return self._fail_execution("BMis connection failed")
+        except Exception:
+            return self._fail_execution("BMis command failed")
+
+        # Validate the actual response only after receiving it.
+        if (
+            not isinstance(result, list)
+            or not result
+            or not isinstance(result[0], str)
+            or re.fullmatch(r"(0|[1-9]\d*)", result[0]) is None
+            or not result[0].isascii()
+            or len(result[0]) > 16
+            or int(result[0]) > 9_007_199_254_740_991
+            or any(not isinstance(key, str) for key in result[1:])
+            or len(result) - 1 > count
+        ):
+            return self._fail_execution("Invalid SCAN response")
+
+        next_cursor = result[0]
+
+        return {
+            "status": True,
+            "keys": result[1:],
+            "nextCursor": next_cursor,
+            "hasMore": next_cursor != "0",
+        }
+
 
 
 def handle_request(

@@ -20,6 +20,7 @@ import {
   type PythonCommand,
 } from './pythonApi';
 import type { ConnectionProfile } from './profiles';
+import { KeyBrowser } from './KeyBrowser';
 
 type ConnectionState = {
   connected: boolean;
@@ -387,6 +388,14 @@ function App() {
             </p>
           )}
         </section>
+
+        <KeyBrowser
+          connectionId={
+            connection.connected
+              ? `${connection.host}:${connection.port}`
+              : null
+          }
+        />
 
         <QuickActions enabled={commandEnabled} onRun={runCommand} />
 

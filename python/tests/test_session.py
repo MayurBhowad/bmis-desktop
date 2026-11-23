@@ -112,6 +112,20 @@ class MockBMisServer:
             self.error = exc
 
     def _reply(self, command: str) -> bytes:
+        if command == "SCAN 12 COUNT 50":
+            return b"*1\r\n$1\r\n0\r\n"
+
+        if command == "SCAN 999 COUNT 50":
+            return b"-ERR invalid cursor\r\n"
+
+        if command.startswith("SCAN "):
+            return (
+                b"*4\r\n"
+                b"$2\r\n12\r\n"
+                b"$6\r\nuser:1\r\n"
+                b"$6\r\nuser:2\r\n"
+                b"$9\r\nsession:1\r\n"
+            )
         if command == "GET multiline":
             return b"$6\r\nMay\nur\r\n"
         if command.startswith("INCR "):
@@ -230,6 +244,43 @@ def test_connect_status_execute_and_disconnect() -> None:
             assert server.error is None
         finally:
             session.close()
+
+
+def test_list_keys_returns_scan_page_and_preserves_connection() -> None:
+    with MockBMisServer() as server:
+        session = BackendSession(client_factory=_fast_client)
+
+        try:
+            connected = handle_request(
+                _connect_request(server.host, server.port),
+                session,
+            )
+            assert connected["connected"] is True
+
+            response = handle_request(
+                {
+                    "command": "list_keys",
+                    "cursor": "0",
+                    "count": 50,
+                },
+                session,
+            )
+
+            assert response == {
+                "status": True,
+                "keys": ["user:1", "user:2", "session:1"],
+                "nextCursor": "12",
+                "hasMore": True,
+            }
+
+            assert server.commands == ["SCAN 0 COUNT 50"]
+
+            status = handle_request({"command": "status"}, session)
+            assert status["connected"] is True
+
+        finally:
+            session.close()
+
 
 
 def test_multiple_operations_use_the_same_connection() -> None:
@@ -876,3 +927,217 @@ def test_session_set_and_get_against_real_bmis_server() -> None:
         assert fetched == {"status": True, "result": "Mayur"}
     finally:
         session.close()
+
+
+
+@pytest.mark.parametrize(
+    ("cursor", "count"),
+    [
+        ("", 50),
+        ("abc", 50),
+        ("-1", 50),
+        ("1.5", 50),
+        (12, 50),
+        ("0", 0),
+        ("0", -1),
+        ("0", 101),
+        ("0", True),
+        ("0", "50"),
+    ],
+)
+def test_list_keys_rejects_invalid_arguments(cursor, count) -> None:
+    session = BackendSession()
+
+    response = handle_request(
+        {
+            "command": "list_keys",
+            "cursor": cursor,
+            "count": count,
+        },
+        session,
+    )
+
+    assert response["status"] is False
+    assert response["error"] in {
+        "Invalid scan cursor",
+        "Count must be an integer between 1 and 100",
+    }
+
+
+
+def test_list_keys_requires_connection() -> None:
+    session = BackendSession()
+
+    response = handle_request(
+        {
+            "command": "list_keys",
+            "cursor": "0",
+            "count": 50,
+        },
+        session,
+    )
+
+    assert response == {
+        "status": False,
+        "error": "Not connected to BMis",
+    }
+
+
+def test_list_keys_handles_completed_scan() -> None:
+    with MockBMisServer() as server:
+        session = BackendSession(client_factory=_fast_client)
+
+        try:
+            handle_request(_connect_request(server.host, server.port), session)
+
+            response = handle_request(
+                {
+                    "command": "list_keys",
+                    "cursor": "12",
+                    "count": 50,
+                },
+                session,
+            )
+
+            assert response == {
+                "status": True,
+                "keys": [],
+                "nextCursor": "0",
+                "hasMore": False,
+            }
+        finally:
+            session.close()
+
+
+
+@pytest.mark.parametrize(
+    "scan_result",
+    [
+        [],
+        None,
+        [12],
+        ["12", "user:1", 123],
+        ["12", "user:1", "user:2", "user:3"],
+    ],
+    ids=[
+        "empty-response",
+        "non-list-response",
+        "non-string-cursor",
+        "non-string-key",
+        "more-keys-than-requested",
+    ],
+)
+def test_list_keys_rejects_malformed_scan_responses(scan_result: object) -> None:
+    with MockBMisServer() as server:
+        session = BackendSession(client_factory=_fast_client)
+
+        try:
+            connected = handle_request(
+                _connect_request(server.host, server.port),
+                session,
+            )
+            assert connected["connected"] is True
+
+            client = session._client
+            assert client is not None
+
+            client.execute = lambda command: scan_result  # type: ignore[method-assign]
+
+            response = handle_request(
+                {
+                    "command": "list_keys",
+                    "cursor": "0",
+                    "count": 2,
+                },
+                session,
+            )
+
+            assert response == {
+                "status": False,
+                "error": "Invalid SCAN response",
+            }
+
+            assert handle_request(
+                {"command": "status"},
+                session,
+            )["connected"] is False
+        finally:
+            session.close()
+
+def test_list_keys_server_cursor_error_preserves_connection() -> None:
+    with MockBMisServer() as server:
+        session = BackendSession(client_factory=_fast_client)
+
+        try:
+            handle_request(_connect_request(server.host, server.port), session)
+
+            response = handle_request(
+                {
+                    "command": "list_keys",
+                    "cursor": "999",
+                    "count": 50,
+                },
+                session,
+            )
+
+            assert response == {
+                "status": False,
+                "error": "ERR invalid cursor",
+            }
+
+            status = handle_request({"command": "status"}, session)
+            assert status["connected"] is True
+        finally:
+            session.close()
+
+
+def test_list_keys_rejects_extremely_long_input_cursor() -> None:
+    session = BackendSession()
+
+    response = handle_request(
+        {
+            "command": "list_keys",
+            "cursor": "9" * 5000,
+            "count": 50,
+        },
+        session,
+    )
+
+    assert response == {
+        "status": False,
+        "error": "Invalid scan cursor",
+    }
+
+
+def test_list_keys_rejects_extremely_long_server_cursor() -> None:
+    with MockBMisServer() as server:
+        session = BackendSession(client_factory=_fast_client)
+
+        try:
+            handle_request(_connect_request(server.host, server.port), session)
+
+            client = session._client
+            assert client is not None
+
+            client.execute = lambda command: ["9" * 5000]  # type: ignore[method-assign]
+
+            response = handle_request(
+                {
+                    "command": "list_keys",
+                    "cursor": "0",
+                    "count": 50,
+                },
+                session,
+            )
+
+            assert response == {
+                "status": False,
+                "error": "Invalid SCAN response",
+            }
+
+            assert handle_request(
+                {"command": "status"},
+                session,
+            )["connected"] is False
+        finally:
+            session.close()

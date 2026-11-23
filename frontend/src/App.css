@@ -913,3 +913,42 @@ select:focus-visible {
     grid-row: auto;
   }
 }
+
+/* Key Browser */
+
+.key-list {
+  display: flex;
+  flex-direction: column;
+  max-height: 18rem;
+  padding: 0.35rem 0.85rem;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--code-bg);
+  scrollbar-width: thin;
+  scrollbar-color: var(--border-strong) transparent;
+}
+
+.key-row {
+  min-width: 0;
+  padding: 0.55rem 0.15rem;
+  border-bottom: 1px solid var(--border);
+}
+
+.key-row:last-child {
+  border-bottom: none;
+}
+
+.key-name {
+  color: var(--text-h);
+  font: 0.82rem/1.5 var(--mono);
+  overflow-wrap: anywhere;
+}
+
+.key-browser-footer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+}

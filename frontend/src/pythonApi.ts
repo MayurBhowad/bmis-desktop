@@ -9,11 +9,19 @@ export type PythonCommand =
   | { command: 'list_profiles' }
   | { command: 'create_profile'; name: string; host: string; port: number }
   | { command: 'update_profile'; id: string; name: string; host: string; port: number }
-  | { command: 'delete_profile'; id: string };
+  | { command: 'delete_profile'; id: string }
+  | { command: 'list_keys'; cursor?: string; count?: number };
 
 export type ParsedPythonResponse = {
   raw: string;
   body: unknown;
+};
+
+export type ListKeysResponse = {
+  status: true;
+  keys: string[];
+  nextCursor: string;
+  hasMore: boolean;
 };
 
 export const MIN_PORT = 1;
@@ -85,4 +93,40 @@ export async function pythonRequest(payload: PythonCommand): Promise<ParsedPytho
   } catch {
     throw new Error('Backend returned malformed JSON');
   }
+}
+
+
+
+
+export function parseListKeysResponse(body: unknown): ListKeysResponse {
+  const failure = failureMessage(body);
+
+  if (failure !== null) {
+    throw new Error(failure);
+  }
+
+  if (typeof body !== 'object' || body === null || Array.isArray(body)) {
+    throw new Error('Backend returned an invalid key listing response');
+  }
+
+  const record = body as Record<string, unknown>;
+
+  if (
+    !Array.isArray(record.keys) ||
+    !record.keys.every((key): key is string => typeof key === 'string') ||
+    typeof record.nextCursor !== 'string' ||
+    !/^(0|[1-9][0-9]*)$/.test(record.nextCursor) ||
+    !Number.isSafeInteger(Number(record.nextCursor)) ||
+    typeof record.hasMore !== 'boolean' ||
+    record.hasMore !== (record.nextCursor !== '0')
+  ) {
+    throw new Error('Backend returned an invalid key listing response');
+  }
+
+  return {
+    status: true,
+    keys: record.keys,
+    nextCursor: record.nextCursor,
+    hasMore: record.hasMore,
+  };
 }
