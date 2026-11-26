@@ -1,4 +1,4 @@
-# BMis Desktop
+# BMis Desktop.
 
 BMis Desktop is a desktop client prototype for the existing **BMis** server. It is a separate project: it does not reimplement the server or own the server's protocol and data-storage behavior.
 
